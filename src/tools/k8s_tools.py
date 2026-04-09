@@ -12,6 +12,58 @@ from langchain.tools import tool
 logger = logging.getLogger(__name__)
 
 
+def _get_current_namespace() -> str:
+    """
+    获取当前命名空间
+
+    优先级：
+    1. 环境变量 POD_NAMESPACE
+    2. kubectl config 获取
+    3. 默认返回 'default'
+
+    Returns:
+        命名空间名称
+    """
+    # 1. 优先使用环境变量
+    namespace = os.getenv("POD_NAMESPACE")
+    if namespace:
+        return namespace
+
+    # 2. 使用 kubectl config
+    try:
+        result = subprocess.run(
+            ["kubectl", "config", "view", "--minify", "--output", "jsonpath={..namespace}"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        pass
+
+    # 3. 默认值
+    return "default"
+
+
+@tool
+def k8s_get_current_namespace() -> str:
+    """
+    获取当前 K8S 命名空间
+
+    Returns:
+        当前命名空间名称
+
+    Example:
+        k8s_get_current_namespace()
+    """
+    namespace = _get_current_namespace()
+    return (
+        f"📍 当前命名空间: {namespace}\n\n"
+        f"获取方式: {'环境变量 POD_NAMESPACE' if os.getenv('POD_NAMESPACE') else 'kubectl config'}\n"
+    )
+
+
 @tool
 def k8s_create_pod(
     namespace: str,

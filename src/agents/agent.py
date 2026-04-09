@@ -24,6 +24,7 @@ from tools.docker_tools import build_docker_image, push_docker_image
 
 # 导入 K8S 工具
 from tools.k8s_tools import (
+    k8s_get_current_namespace,
     k8s_create_pod,
     k8s_get_pod_status,
     k8s_get_pod_logs,
@@ -106,6 +107,7 @@ def build_agent(ctx=None):
         push_docker_image,
 
         # K8S 工具
+        k8s_get_current_namespace,
         k8s_create_pod,
         k8s_get_pod_status,
         k8s_get_pod_logs,
