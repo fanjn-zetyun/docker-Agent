@@ -15,6 +15,7 @@ from storage.memory.memory_saver import get_memory_saver
 
 # 导入工具
 from tools.docker_tools import build_docker_image, push_docker_image
+from tools.git_tools import git_pull, git_checkout, git_merge, git_status
 
 LLM_CONFIG = "config/agent_llm_config.json"
 
@@ -66,7 +67,14 @@ def build_agent(ctx=None):
     )
 
     # 构建工具列表
-    tools = [build_docker_image, push_docker_image]
+    tools = [
+        git_pull,
+        git_checkout,
+        git_merge,
+        git_status,
+        build_docker_image,
+        push_docker_image
+    ]
 
     # 创建 Agent，带短期记忆功能
     agent = create_agent(
