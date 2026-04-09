@@ -1,6 +1,6 @@
 """
-Docker 镜像管理 Agent
-负责自动化地构建 Docker 镜像并推送到私有镜像仓库
+LlamaFactory 镜像构建 Agent
+专门负责自动化构建和验证 LlamaFactory 的 Docker 镜像
 """
 import os
 import json
@@ -13,9 +13,31 @@ from langchain_core.messages import AnyMessage
 from coze_coding_utils.runtime_ctx.context import default_headers
 from storage.memory.memory_saver import get_memory_saver
 
-# 导入工具
-from tools.docker_tools import build_docker_image, push_docker_image
+# 导入 Git 工具
 from tools.git_tools import git_pull, git_checkout, git_merge, git_status
+
+# 导入 Dockerfile 分析工具
+from tools.dockerfile_analyzer import analyze_dockerfile, learn_dockerfile_pattern, validate_dockerfile
+
+# 导入 Docker 工具
+from tools.docker_tools import build_docker_image, push_docker_image
+
+# 导入 K8S 工具
+from tools.k8s_tools import (
+    k8s_create_pod,
+    k8s_get_pod_status,
+    k8s_get_pod_logs,
+    k8s_delete_pod,
+    k8s_wait_for_pod_ready,
+    k8s_exec_command
+)
+
+# 导入验证工具
+from tools.llamafactory_validator import (
+    verify_llama_factory_installation,
+    run_llama_factory_training,
+    run_quick_validation
+)
 
 LLM_CONFIG = "config/agent_llm_config.json"
 
@@ -34,7 +56,7 @@ class AgentState(MessagesState):
 
 def build_agent(ctx=None):
     """
-    构建 Docker 镜像管理 Agent
+    构建 LlamaFactory 镜像构建 Agent
 
     Returns:
         构建好的 Agent 实例
@@ -66,14 +88,35 @@ def build_agent(ctx=None):
         default_headers=default_headers(ctx) if ctx else {}
     )
 
-    # 构建工具列表
+    # 构建工具列表（按功能分组）
     tools = [
+        # Git 操作工具
         git_pull,
         git_checkout,
         git_merge,
         git_status,
+
+        # Dockerfile 分析工具
+        analyze_dockerfile,
+        learn_dockerfile_pattern,
+        validate_dockerfile,
+
+        # Docker 工具
         build_docker_image,
-        push_docker_image
+        push_docker_image,
+
+        # K8S 工具
+        k8s_create_pod,
+        k8s_get_pod_status,
+        k8s_get_pod_logs,
+        k8s_delete_pod,
+        k8s_wait_for_pod_ready,
+        k8s_exec_command,
+
+        # 验证工具
+        verify_llama_factory_installation,
+        run_llama_factory_training,
+        run_quick_validation
     ]
 
     # 创建 Agent，带短期记忆功能
