@@ -3,8 +3,11 @@
 用于验证 LlamaFactory 镜像是否能够正常进行模型微调
 """
 import os
+import logging
 import subprocess
 from langchain.tools import tool
+
+logger = logging.getLogger(__name__)
 
 
 @tool
