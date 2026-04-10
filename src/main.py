@@ -482,7 +482,7 @@ async def http_graph_inout_parameter(request: Request):
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Start FastAPI server")
-    parser.add_argument("-m", type=str, default="http", help="Run mode, support http,flow,node")
+    parser.add_argument("-m", type=str, default="http", help="Run mode, support http, cli, flow, node")
     parser.add_argument("-n", type=str, default="", help="Node ID for single node run")
     parser.add_argument("-p", type=int, default=5000, help="HTTP server port")
     parser.add_argument("-i", type=str, default="", help="Input JSON string for flow/node mode")
@@ -514,6 +514,14 @@ if __name__ == "__main__":
     args = parse_args()
     if args.m == "http":
         start_http_server(args.p)
+    elif args.m == "cli":
+        # 启动 CLI 模式
+        import sys
+        import asyncio
+        from pathlib import Path
+        sys.path.insert(0, str(Path(__file__).parent))
+        from cli import main as cli_main
+        asyncio.run(cli_main())
     elif args.m == "flow":
         payload = parse_input(args.i)
         result = asyncio.run(service.run(payload))

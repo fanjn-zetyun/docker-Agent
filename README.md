@@ -192,9 +192,13 @@ S3_CONFIG = {
 
 ## 📖 使用方法
 
-### 命令行模式
+### 命令行交互模式（CLI）
 
 ```bash
+# 方式一：直接运行 CLI
+python src/cli.py
+
+# 方式二：通过 main.py
 python src/main.py -m cli
 ```
 
@@ -204,6 +208,14 @@ python src/main.py -m cli
 你: 帮我构建 LlamaFactory 镜像
 Agent: 好的，我来帮你构建镜像。首先让我拉取官方仓库的最新代码...
 ```
+
+**CLI 模式特性**：
+- 💬 自然语言对话
+- 📝 对话历史保存
+- 🎯 实时流式输出
+- 🔧 快捷命令（help、clear、history、exit）
+
+详细的 CLI 使用指南请参考 [CLI 模式文档](docs/CLI_MODE.md)。
 
 ### HTTP 服务模式
 
@@ -518,11 +530,12 @@ spec:
 
 ## 📚 更多文档
 
+- [CLI 模式使用文档](docs/CLI_MODE.md) - 命令行交互模式说明
+- [Web UI 使用指南](docs/WEB_UI_GUIDE.md) - Web UI 界面使用说明
 - [用户模型配置文档](docs/USER_MODEL_CONFIG.md) - 详细的模型配置说明
 - [K8S 部署配置文档](docs/K8S_DEPLOYMENT.md) - K8S 部署配置详解
 - [K8S 部署和使用文档](docs/K8S_DEPLOY_USAGE.md) - K8S 部署和使用指南
 - [K8S 快速部署指南](k8s/README.md) - 快速部署到 K8S
-- [Web UI 使用指南](docs/WEB_UI_GUIDE.md) - Web UI 界面使用说明
 
 ## 🤝 贡献
 
