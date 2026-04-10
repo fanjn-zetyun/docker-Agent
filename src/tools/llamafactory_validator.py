@@ -10,15 +10,51 @@ from langchain.tools import tool
 logger = logging.getLogger(__name__)
 
 
+def _load_user_config():
+    """
+    加载用户配置文件
+
+    Returns:
+        用户配置模块，如果不存在则返回 None
+    """
+    workspace_path = os.getenv("COZE_WORKSPACE_PATH", "/workspace/projects")
+    user_config_path = os.path.join(workspace_path, "config/user_model_config.py")
+
+    if not os.path.exists(user_config_path):
+        return None
+
+    try:
+        import sys
+        sys.path.insert(0, os.path.dirname(user_config_path))
+
+        config_module_name = os.path.splitext(os.path.basename(user_config_path))[0]
+        config_module = __import__(config_module_name)
+
+        return config_module
+    except Exception:
+        return None
+
+
+# 默认验证配置
+DEFAULT_VALIDATION_CONFIG = {
+    "model_name_or_path": "Qwen/Qwen2-0.5B-Instruct",
+    "template": "qwen",
+    "dataset": "alpaca_zh_demo",
+    "max_samples": 10,
+    "output_dir": "/tmp/llama_factory_output"
+}
+
+
 @tool
 def run_llama_factory_training(
     namespace: str,
     pod_name: str,
     config_file: str = None,
-    model_name: str = "Qwen/Qwen2-0.5B-Instruct",
-    dataset: str = "alpaca_zh_demo",
-    output_dir: str = "/tmp/llama_factory_output",
-    max_samples: int = 10
+    model_name: str = None,
+    dataset: str = None,
+    output_dir: str = None,
+    max_samples: int = None,
+    template: str = None
 ) -> str:
     """
     在 LlamaFactory pod 中运行模型微调任务进行验证
@@ -27,10 +63,11 @@ def run_llama_factory_training(
         namespace: K8S 命名空间
         pod_name: pod 名称
         config_file: 训练配置文件路径（可选，不提供则使用默认配置）
-        model_name: 要微调的模型名称
-        dataset: 数据集名称
-        output_dir: 输出目录
-        max_samples: 最大样本数（用于快速验证）
+        model_name: 要微调的模型名称（可选，不提供则使用配置文件或默认值）
+        dataset: 数据集名称（可选，不提供则使用配置文件或默认值）
+        output_dir: 输出目录（可选，不提供则使用配置文件或默认值）
+        max_samples: 最大样本数（可选，不提供则使用配置文件或默认值）
+        template: 模板类型（可选，不提供则使用配置文件或默认值）
 
     Returns:
         微调任务执行结果
@@ -38,32 +75,65 @@ def run_llama_factory_training(
     Example:
         run_llama_factory_training(
             namespace="llama-test",
-            pod_name="llama-factory-test",
-            model_name="Qwen/Qwen2-0.5B-Instruct",
-            max_samples=10
+            pod_name="llama-factory-test"
         )
     """
     try:
-        # 构建 LlamaFactory 训练命令
-        cmd = f"""llamafactory-cli train \\
-            --stage sft \\
-            --model_name_or_path {model_name} \\
-            --dataset {dataset} \\
-            --template qwen \\
-            --finetuning_type lora \\
-            --lora_target q_proj,v_proj \\
-            --output_dir {output_dir} \\
-            --per_device_train_batch_size 2 \\
-            --gradient_accumulation_steps 4 \\
-            --lr_scheduler_type cosine \\
-            --logging_steps 10 \\
-            --save_steps 100 \\
-            --learning_rate 5.0e-5 \\
-            --num_train_epochs 1.0 \\
-            --plot_loss true \\
-            --max_samples {max_samples} \\
-            --fp16
-        """
+        # 加载用户配置
+        user_config = _load_user_config()
+
+        # 确定使用的配置（优先级：函数参数 > 用户配置 > 默认配置）
+        if model_name is None:
+            if user_config and hasattr(user_config, 'VALIDATION_FULL_MODEL'):
+                model_name = user_config.VALIDATION_FULL_MODEL.get('model_name_or_path')
+                template = user_config.VALIDATION_FULL_MODEL.get('template')
+            else:
+                model_name = DEFAULT_VALIDATION_CONFIG['model_name_or_path']
+                template = DEFAULT_VALIDATION_CONFIG.get('template', 'qwen')
+
+        if dataset is None:
+            if user_config and hasattr(user_config, 'VALIDATION_DATASET'):
+                dataset = user_config.VALIDATION_DATASET.get('name')
+                max_samples = max_samples or user_config.VALIDATION_DATASET.get('max_samples', 10)
+            else:
+                dataset = DEFAULT_VALIDATION_CONFIG['dataset']
+                max_samples = max_samples or DEFAULT_VALIDATION_CONFIG['max_samples']
+
+        if output_dir is None:
+            if user_config and hasattr(user_config, 'VALIDATION_OUTPUT'):
+                output_dir = user_config.VALIDATION_OUTPUT.get('output_dir')
+            else:
+                output_dir = DEFAULT_VALIDATION_CONFIG['output_dir']
+
+        if max_samples is None:
+            max_samples = 10
+
+        if template is None:
+            template = 'qwen'
+
+        # 构建基础训练命令
+        cmd_parts = [
+            "llamafactory-cli train",
+            "--stage sft",
+            f"--model_name_or_path {model_name}",
+            f"--dataset {dataset}",
+            f"--template {template}",
+            "--finetuning_type lora",
+            "--lora_target q_proj,v_proj",
+            f"--output_dir {output_dir}",
+            "--per_device_train_batch_size 2",
+            "--gradient_accumulation_steps 4",
+            "--lr_scheduler_type cosine",
+            "--logging_steps 10",
+            "--save_steps 100",
+            "--learning_rate 5.0e-5",
+            "--num_train_epochs 1.0",
+            "--plot_loss true",
+            f"--max_samples {max_samples}",
+            "--fp16"
+        ]
+
+        cmd = " \\\n    ".join(cmd_parts)
 
         logger.info(f"在 pod {pod_name} 中运行微调任务")
 
@@ -215,7 +285,8 @@ def verify_llama_factory_installation(
 @tool
 def run_quick_validation(
     namespace: str,
-    pod_name: str
+    pod_name: str,
+    model_name: str = None
 ) -> str:
     """
     运行快速验证测试，检查 LlamaFactory 核心功能
@@ -223,6 +294,7 @@ def run_quick_validation(
     Args:
         namespace: K8S 命名空间
         pod_name: pod 名称
+        model_name: 用于验证的模型名称（可选，不提供则使用配置文件或默认值）
 
     Returns:
         验证结果
@@ -233,18 +305,22 @@ def run_quick_validation(
     try:
         logger.info(f"运行快速验证: {pod_name}")
 
-        # 运行一个简单的推理测试
-        cmd = """llamafactory-cli api \\
-            --model_name_or_path Qwen/Qwen2-0.5B-Instruct \\
-            --template qwen
-        """
+        # 加载用户配置
+        user_config = _load_user_config()
 
-        # 这个命令会启动 API 服务，我们用一个更简单的测试
+        # 确定使用的模型
+        if model_name is None:
+            if user_config and hasattr(user_config, 'VALIDATION_QUICK_MODEL'):
+                model_name = user_config.VALIDATION_QUICK_MODEL.get('model_name_or_path')
+            else:
+                model_name = DEFAULT_VALIDATION_CONFIG['model_name_or_path']
+
+        # 运行一个简单的推理测试
         # 直接测试模型加载
-        simple_test = """python -c "
+        simple_test = f"""python -c "
 from transformers import AutoTokenizer, AutoModelForCausalLM
 print('开始加载模型...')
-tokenizer = AutoTokenizer.from_pretrained('Qwen/Qwen2-0.5B-Instruct')
+tokenizer = AutoTokenizer.from_pretrained('{model_name}')
 print('Tokenizer 加载成功')
 print('验证通过！')
 " """

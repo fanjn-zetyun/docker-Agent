@@ -41,9 +41,38 @@ from tools.llamafactory_validator import (
 )
 
 LLM_CONFIG = "config/agent_llm_config.json"
+USER_MODEL_CONFIG = "config/user_model_config.py"
 
 # 默认保留最近 20 轮对话 (40 条消息)
 MAX_MESSAGES = 40
+
+
+def _load_user_model_config():
+    """
+    加载用户自定义模型配置
+
+    Returns:
+        用户配置字典，如果配置文件不存在则返回 None
+    """
+    workspace_path = os.getenv("COZE_WORKSPACE_PATH", "/workspace/projects")
+    user_config_path = os.path.join(workspace_path, USER_MODEL_CONFIG)
+
+    if not os.path.exists(user_config_path):
+        return None
+
+    try:
+        # 动态导入用户配置
+        import sys
+        sys.path.insert(0, os.path.dirname(user_config_path))
+
+        config_module_name = os.path.splitext(os.path.basename(user_config_path))[0]
+        config_module = __import__(config_module_name)
+
+        return config_module
+    except Exception as e:
+        # 如果配置文件加载失败，使用默认配置
+        print(f"⚠️  加载用户模型配置失败: {str(e)}，使用默认配置")
+        return None
 
 
 def _windowed_messages(old, new):
@@ -69,21 +98,58 @@ def build_agent(ctx=None):
     with open(config_path, 'r', encoding='utf-8') as f:
         cfg = json.load(f)
 
-    # 获取环境变量中的 API Key 和 Base URL
+    # 尝试加载用户自定义模型配置
+    user_config = _load_user_model_config()
+
+    # 确定使用的模型配置
+    model_config = cfg['config']
+
+    if user_config and hasattr(user_config, 'AGENT_MODEL'):
+        # 检查用户是否配置了自定义模型
+        user_agent_model = user_config.AGENT_MODEL
+
+        # 检查是否是自定义端点（包含 api_key 和 base_url）
+        if 'api_key' in user_agent_model and 'base_url' in user_agent_model:
+            # 使用自定义模型端点
+            api_key = user_agent_model['api_key']
+            base_url = user_agent_model['base_url']
+            model_config['model'] = user_agent_model['model']
+            print(f"✅ 使用自定义模型端点: {base_url}")
+        else:
+            # 使用内置模型，但使用用户指定的模型名称
+            model_config['model'] = user_agent_model['model']
+            print(f"✅ 使用用户配置的内置模型: {model_config['model']}")
+
+        # 更新其他配置参数
+        if 'temperature' in user_agent_model:
+            model_config['temperature'] = user_agent_model['temperature']
+        if 'top_p' in user_agent_model:
+            model_config['top_p'] = user_agent_model['top_p']
+        if 'max_completion_tokens' in user_agent_model:
+            model_config['max_completion_tokens'] = user_agent_model['max_completion_tokens']
+        if 'timeout' in user_agent_model:
+            model_config['timeout'] = user_agent_model['timeout']
+        if 'thinking' in user_agent_model:
+            model_config['thinking'] = user_agent_model['thinking']
+    else:
+        # 使用默认配置
+        print(f"ℹ️  使用默认模型: {model_config['model']}")
+
+    # 获取环境变量中的 API Key 和 Base URL（如果用户配置中没有指定）
     api_key = os.getenv("COZE_WORKLOAD_IDENTITY_API_KEY")
     base_url = os.getenv("COZE_INTEGRATION_MODEL_BASE_URL")
 
     # 初始化 LLM
     llm = ChatOpenAI(
-        model=cfg['config'].get("model"),
+        model=model_config.get("model"),
         api_key=api_key,
         base_url=base_url,
-        temperature=cfg['config'].get('temperature', 0.7),
+        temperature=model_config.get('temperature', 0.7),
         streaming=True,
-        timeout=cfg['config'].get('timeout', 600),
+        timeout=model_config.get('timeout', 600),
         extra_body={
             "thinking": {
-                "type": cfg['config'].get('thinking', 'disabled')
+                "type": model_config.get('thinking', 'disabled')
             }
         },
         default_headers=default_headers(ctx) if ctx else {}
