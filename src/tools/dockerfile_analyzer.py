@@ -7,6 +7,109 @@ import re
 from langchain.tools import tool
 
 
+def _analyze_dockerfile_internal(dockerfile_path: str) -> dict:
+    """
+    内部函数：分析 Dockerfile 并返回结构化数据
+
+    Args:
+        dockerfile_path: Dockerfile 文件路径
+
+    Returns:
+        分析结果的字典
+    """
+    workspace_path = os.getenv("COZE_WORKSPACE_PATH", "/workspace/projects")
+
+    if not os.path.isabs(dockerfile_path):
+        dockerfile_full_path = os.path.join(workspace_path, dockerfile_path)
+    else:
+        dockerfile_full_path = dockerfile_path
+
+    if not os.path.exists(dockerfile_full_path):
+        raise FileNotFoundError(f"Dockerfile 不存在于路径 {dockerfile_full_path}")
+
+    with open(dockerfile_full_path, 'r', encoding='utf-8') as f:
+        content = f.read()
+
+    analysis = {
+        "基础镜像": [],
+        "安装的依赖": [],
+        "复制的文件": [],
+        "环境变量": [],
+        "暴露的端口": [],
+        "工作目录": [],
+        "构建参数": [],
+        "运行命令": [],
+        "总行数": len(content.splitlines())
+    }
+
+    # 解析 Dockerfile
+    for line in content.splitlines():
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+
+        # FROM - 基础镜像
+        if line.upper().startswith('FROM'):
+            parts = line.split()
+            if len(parts) > 1:
+                analysis["基础镜像"].append(' '.join(parts[1:]))
+
+        # RUN - 安装依赖或执行命令
+        elif line.upper().startswith('RUN'):
+            cmd = line[4:].strip()
+            analysis["运行命令"].append(cmd)
+            # 检测常见的依赖安装
+            if any(x in cmd.lower() for x in ['pip install', 'apt-get install', 'apt install', 'yum install']):
+                # 提取包名
+                if 'pip install' in cmd.lower():
+                    deps = re.findall(r'pip install\s+-[^\s]*\s+(.+)', cmd)
+                    if not deps:
+                        deps = re.findall(r'pip install\s+(.+)', cmd)
+                    if deps:
+                        analysis["安装的依赖"].extend(deps)
+                elif 'apt-get install' in cmd.lower() or 'apt install' in cmd.lower():
+                    deps = re.findall(r'(?:apt-get|apt) install\s+-[^\s]*\s+(.+)', cmd)
+                    if not deps:
+                        deps = re.findall(r'(?:apt-get|apt) install\s+(.+)', cmd)
+                    if deps:
+                        analysis["安装的依赖"].append(deps[0])
+
+        # COPY/ADD - 复制文件
+        elif line.upper().startswith('COPY') or line.upper().startswith('ADD'):
+            parts = line.split()
+            if len(parts) > 1:
+                analysis["复制的文件"].append(' '.join(parts[1:]))
+
+        # ENV - 环境变量
+        elif line.upper().startswith('ENV'):
+            parts = line.split(None, 2)
+            if len(parts) > 1:
+                analysis["环境变量"].append(' '.join(parts[1:]))
+
+        # EXPOSE - 暴露端口
+        elif line.upper().startswith('EXPOSE'):
+            ports = line.split()[1:]
+            analysis["暴露的端口"].extend(ports)
+
+        # WORKDIR - 工作目录
+        elif line.upper().startswith('WORKDIR'):
+            parts = line.split()
+            if len(parts) > 1:
+                analysis["工作目录"].append(parts[1])
+
+        # ARG - 构建参数
+        elif line.upper().startswith('ARG'):
+            parts = line.split(None, 1)
+            if len(parts) > 1:
+                analysis["构建参数"].append(parts[1])
+
+        # CMD/ENTRYPOINT - 启动命令
+        elif line.upper().startswith('CMD') or line.upper().startswith('ENTRYPOINT'):
+            analysis["运行命令"].append(line)
+
+    return analysis
+
+
 @tool
 def analyze_dockerfile(dockerfile_path: str) -> str:
     """
@@ -22,109 +125,22 @@ def analyze_dockerfile(dockerfile_path: str) -> str:
         analyze_dockerfile(dockerfile_path="Dockerfile")
     """
     try:
-        workspace_path = os.getenv("COZE_WORKSPACE_PATH", "/workspace/projects")
-
-        if not os.path.isabs(dockerfile_path):
-            dockerfile_full_path = os.path.join(workspace_path, dockerfile_path)
-        else:
-            dockerfile_full_path = dockerfile_path
-
-        if not os.path.exists(dockerfile_full_path):
-            return f"错误：Dockerfile 不存在于路径 {dockerfile_full_path}"
-
-        with open(dockerfile_full_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-
-        analysis = {
-            "基础镜像": [],
-            "安装的依赖": [],
-            "复制的文件": [],
-            "环境变量": [],
-            "暴露的端口": [],
-            "工作目录": [],
-            "构建参数": [],
-            "运行命令": [],
-            "总行数": len(content.splitlines())
-        }
-
-        # 解析 Dockerfile
-        for line in content.splitlines():
-            line = line.strip()
-            if not line or line.startswith('#'):
-                continue
-
-            # FROM - 基础镜像
-            if line.upper().startswith('FROM'):
-                parts = line.split()
-                if len(parts) > 1:
-                    analysis["基础镜像"].append(' '.join(parts[1:]))
-
-            # RUN - 安装依赖或执行命令
-            elif line.upper().startswith('RUN'):
-                cmd = line[4:].strip()
-                analysis["运行命令"].append(cmd)
-                # 检测常见的依赖安装
-                if any(x in cmd.lower() for x in ['pip install', 'apt-get install', 'apt install', 'yum install']):
-                    # 提取包名
-                    if 'pip install' in cmd.lower():
-                        deps = re.findall(r'pip install\s+-[^\s]*\s+(.+)', cmd)
-                        if not deps:
-                            deps = re.findall(r'pip install\s+(.+)', cmd)
-                        if deps:
-                            analysis["安装的依赖"].extend(deps)
-                    elif 'apt-get install' in cmd.lower() or 'apt install' in cmd.lower():
-                        deps = re.findall(r'(?:apt-get|apt) install\s+-[^\s]*\s+(.+)', cmd)
-                        if not deps:
-                            deps = re.findall(r'(?:apt-get|apt) install\s+(.+)', cmd)
-                        if deps:
-                            analysis["安装的依赖"].append(deps[0])
-
-            # COPY/ADD - 复制文件
-            elif line.upper().startswith('COPY') or line.upper().startswith('ADD'):
-                parts = line.split()
-                if len(parts) > 1:
-                    analysis["复制的文件"].append(' '.join(parts[1:]))
-
-            # ENV - 环境变量
-            elif line.upper().startswith('ENV'):
-                parts = line.split(None, 2)
-                if len(parts) > 1:
-                    analysis["环境变量"].append(' '.join(parts[1:]))
-
-            # EXPOSE - 暴露端口
-            elif line.upper().startswith('EXPOSE'):
-                ports = line.split()[1:]
-                analysis["暴露的端口"].extend(ports)
-
-            # WORKDIR - 工作目录
-            elif line.upper().startswith('WORKDIR'):
-                parts = line.split()
-                if len(parts) > 1:
-                    analysis["工作目录"].append(parts[1])
-
-            # ARG - 构建参数
-            elif line.upper().startswith('ARG'):
-                parts = line.split(None, 1)
-                if len(parts) > 1:
-                    analysis["构建参数"].append(parts[1])
-
-            # CMD/ENTRYPOINT - 启动命令
-            elif line.upper().startswith('CMD') or line.upper().startswith('ENTRYPOINT'):
-                analysis["运行命令"].append(line)
+        analysis = _analyze_dockerfile_internal(dockerfile_path)
 
         # 生成报告
         report = "📊 Dockerfile 分析报告\n\n"
         report += "=" * 80 + "\n"
 
         for key, value in analysis.items():
-            if value:
+            if isinstance(value, list) and value:
                 report += f"\n🔹 {key}:\n"
                 for item in value:
                     report += f"  - {item}\n"
+            elif not isinstance(value, list):
+                report += f"\n🔹 {key}: {value}\n"
             else:
                 report += f"\n🔹 {key}: 无\n"
 
-        # 总结和建议
         report += "\n" + "=" * 80 + "\n"
         report += "\n📝 构建规律总结:\n"
         report += f"1. 基于 {len(analysis['基础镜像'])} 个基础镜像构建\n"
@@ -138,6 +154,8 @@ def analyze_dockerfile(dockerfile_path: str) -> str:
 
         return report
 
+    except FileNotFoundError as e:
+        return f"❌ {str(e)}"
     except Exception as e:
         return f"❌ 分析 Dockerfile 时发生异常: {str(e)}"
 
@@ -158,37 +176,48 @@ def learn_dockerfile_pattern(dockerfile_path: str, previous_analysis: dict = Non
         learn_dockerfile_pattern(dockerfile_path="Dockerfile")
     """
     try:
-        # 先分析当前 Dockerfile
-        analyze_result = analyze_dockerfile(dockerfile_path)
+        # 使用内部函数分析当前 Dockerfile
+        analysis = _analyze_dockerfile_internal(dockerfile_path)
 
-        if not previous_analysis:
-            return (
-                f"📚 Dockerfile 学习报告（首次分析）\n\n"
-                f"{analyze_result}\n\n"
-                f"💡 记住了当前的构建模式，下次可以对比变化！"
-            )
-
-        # 对比变化
-        changes = []
-
-        # 这里可以添加更详细的对比逻辑
-        # 当前简化实现
-
+        # 生成当前的分析报告
         report = "📚 Dockerfile 学习报告\n\n"
         report += "=" * 80 + "\n\n"
 
-        if changes:
-            report += "🔄 检测到的变化:\n"
-            for change in changes:
-                report += f"  - {change}\n"
+        if previous_analysis:
+            # 对比变化
+            changes = []
+            for key in analysis:
+                if key in previous_analysis:
+                    if analysis[key] != previous_analysis[key]:
+                        changes.append(f"{key} 发生了变化")
+
+            if changes:
+                report += "🔄 检测到的变化:\n"
+                for change in changes:
+                    report += f"  - {change}\n"
+            else:
+                report += "✅ Dockerfile 与之前版本一致，无变化\n"
         else:
-            report += "✅ Dockerfile 与之前版本一致，无变化\n"
+            report += "📖 首次分析 Dockerfile\n"
 
         report += "\n" + "=" * 80 + "\n"
-        report += f"\n{analyze_result}"
+        report += "\n📊 当前分析结果:\n\n"
+
+        for key, value in analysis.items():
+            if isinstance(value, list) and value:
+                report += f"🔹 {key}:\n"
+                for item in value:
+                    report += f"  - {item}\n"
+            elif not isinstance(value, list):
+                report += f"🔹 {key}: {value}\n"
+
+        report += "\n" + "=" * 80 + "\n"
+        report += "\n💡 记住了当前的构建模式，下次可以对比变化！"
 
         return report
 
+    except FileNotFoundError as e:
+        return f"❌ {str(e)}"
     except Exception as e:
         return f"❌ 学习 Dockerfile 时发生异常: {str(e)}"
 
