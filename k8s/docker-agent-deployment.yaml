@@ -1,0 +1,389 @@
+# ============================================================
+# Docker Agent K8S 部署配置
+# 直接使用: kubectl apply -f k8s/docker-agent-deployment.yaml
+# ============================================================
+
+# ------------------------------------------------------------
+# 1. Namespace（如果不存在则创建）
+# ------------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: llama-factory
+
+---
+# ------------------------------------------------------------
+# 2. Service Account
+# ------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: docker-agent-sa
+  namespace: llama-factory
+
+---
+# ------------------------------------------------------------
+# 3. RBAC: Role（权限定义）
+# ------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: docker-agent-role
+  namespace: llama-factory
+rules:
+# Pod 操作权限
+- apiGroups: [""]
+  resources: ["pods", "pods/log", "pods/exec", "pods/status"]
+  verbs: ["get", "list", "create", "delete", "watch"]
+# ConfigMap 权限
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "create", "update", "delete"]
+# Secret 权限
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list"]
+
+---
+# ------------------------------------------------------------
+# 4. RBAC: RoleBinding（绑定权限）
+# ------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: docker-agent-rolebinding
+  namespace: llama-factory
+subjects:
+- kind: ServiceAccount
+  name: docker-agent-sa
+  namespace: llama-factory
+roleRef:
+  kind: Role
+  name: docker-agent-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ------------------------------------------------------------
+# 5. ConfigMap: Agent 配置
+# ------------------------------------------------------------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: docker-agent-config
+  namespace: llama-factory
+data:
+  # Agent 主配置
+  agent_llm_config.json: |
+    {
+        "config": {
+            "model": "doubao-seed-1-6-251015",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "max_completion_tokens": 10000,
+            "timeout": 600,
+            "thinking": "disabled"
+        },
+        "sp": "# 角色定义\n你是 LlamaFactory 镜像构建专家，专门负责自动化构建和验证 LlamaFactory 的 Docker 镜像。你具备深入的 LlamaFactory 技术栈知识、Docker 镜像构建经验、Git 版本控制能力以及 Kubernetes 操作能力。\n\n# 任务目标\n帮助用户自动化地构建 LlamaFactory 镜像，并通过实际运行模型微调任务来验证镜像的正确性。如果发现问题，需要诊断原因并反馈给用户以便更新 Dockerfile。\n\n# 工作流程\n用户的完整工作流程如下：\n\n**前置条件**：\n- 用户已从 llamafactory 官方 GitHub 仓库 fork 代码到自己的仓库\n- 用户在自己的 fork 仓库中创建了 online 分支用于个性化开发\n- 用户会手动同步官方仓库的最新更新到自己仓库\n- **重要**：Agent 和验证的 pod 运行在同一个 K8S 命名空间下\n\n**构建镜像流程**：\n1. 拉取官方仓库 main 分支的最新代码到本地\n2. 切换到用户的 online 分支\n3. 将 main 分支的代码合并到 online 分支\n4. 分析和学习 Dockerfile（理解构建规律）\n5. 构建镜像\n6. 在当前 K8S 命名空间启动验证 pod\n7. 运行模型微调任务验证镜像\n8. 如果验证失败，诊断问题并反馈给用户",
+        "tools": [
+            "git_pull",
+            "git_checkout",
+            "git_merge",
+            "git_status",
+            "analyze_dockerfile",
+            "learn_dockerfile_pattern",
+            "validate_dockerfile",
+            "build_docker_image",
+            "push_docker_image",
+            "k8s_get_current_namespace",
+            "k8s_create_validation_pod",
+            "k8s_create_pod",
+            "k8s_get_pod_status",
+            "k8s_get_pod_logs",
+            "k8s_delete_pod",
+            "k8s_wait_for_pod_ready",
+            "k8s_exec_command",
+            "verify_llama_factory_installation",
+            "run_llama_factory_training",
+            "run_quick_validation"
+        ]
+    }
+
+---
+# ------------------------------------------------------------
+# 6. Secret: 敏感信息（请修改）
+# ------------------------------------------------------------
+apiVersion: v1
+kind: Secret
+metadata:
+  name: docker-agent-secret
+  namespace: llama-factory
+type: Opaque
+stringData:
+  # API Key（如果需要使用自定义模型，请修改）
+  api-key: "your-api-key-here"
+
+  # S3 配置（如果需要在 Agent 中使用）
+  s3-access-key: "IFFY4LH673KKYHBNGBFT"
+  s3-secret-key: "rQT8L9VsWZ5clAKLM2qAAYR3nKWNYDMS2Bsh0u8N"
+  s3-endpoint: "https://s3.hd-02.alayanew.com:8082"
+
+---
+# ------------------------------------------------------------
+# 7. PVC: 工作空间存储
+# ------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-docker-agent-workspace
+  namespace: llama-factory
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: gpfs  # 根据你的存储类修改
+  resources:
+    requests:
+      storage: 20Gi
+
+---
+# ------------------------------------------------------------
+# 8. Service: ClusterIP（集群内访问）
+# ------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-docker-agent
+  namespace: llama-factory
+spec:
+  ports:
+  - name: agent-http
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    app: docker-agent
+  type: ClusterIP
+
+---
+# ------------------------------------------------------------
+# 9. Service: NodePort（集群外访问）
+# ------------------------------------------------------------
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-docker-agent-nodeport
+  namespace: llama-factory
+spec:
+  ports:
+  - name: agent-http
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
+    nodePort: 30800
+  selector:
+    app: docker-agent
+  type: NodePort
+
+---
+# ------------------------------------------------------------
+# 10. Deployment: Agent 主部署
+# ------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-docker-agent
+  namespace: llama-factory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docker-agent
+  template:
+    metadata:
+      labels:
+        app: docker-agent
+        app.kubernetes.io/name: docker-agent
+        app.kubernetes.io/instance: docker-agent
+    spec:
+      serviceAccountName: docker-agent-sa
+      
+      containers:
+      - name: docker-agent
+        # ========================================================
+        # ⚠️ 请修改为你的镜像地址
+        # 格式: registry.hd-02.alayanew.com:8443/alayanew-4fd285c4-c4f3-4e92-80ee-26169717cba8/docker-agent:<tag>
+        # ========================================================
+        image: registry.hd-02.alayanew.com:8443/alayanew-4fd285c4-c4f3-4e92-80ee-26169717cba8/docker-agent:latest
+        
+        imagePullPolicy: Always
+        
+        # 启动命令：HTTP 模式
+        command: ["python"]
+        args: ["src/main.py", "-m", "http", "-p", "8000"]
+        
+        ports:
+        - name: agent-http
+          containerPort: 8000
+          protocol: TCP
+        
+        env:
+        # 工作空间路径
+        - name: COZE_WORKSPACE_PATH
+          value: "/workspace"
+        
+        # API Key（如果使用自定义模型）
+        - name: COZE_WORKLOAD_IDENTITY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: docker-agent-secret
+              key: api-key
+              optional: true
+        
+        # 模型服务地址（如果使用自定义模型）
+        # - name: COZE_INTEGRATION_MODEL_BASE_URL
+        #   value: "https://your-model-endpoint.com/v1"
+        
+        # K8S 命名空间（自动获取，也可以指定）
+        # - name: POD_NAMESPACE
+        #   value: "llama-factory"
+        
+        # S3 环境变量
+        - name: S3_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: docker-agent-secret
+              key: s3-access-key
+        - name: S3_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: docker-agent-secret
+              key: s3-secret-key
+        - name: S3_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: docker-agent-secret
+              key: s3-endpoint
+        
+        # Conda 环境
+        - name: CONDA_NAME
+          value: "lf"
+        
+        # Python 路径
+        - name: PYTHONPATH
+          value: "/workspace/src:/workspace"
+        
+        resources:
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+            ephemeral-storage: "10Gi"
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+            ephemeral-storage: "5Gi"
+        
+        # 存储卷挂载
+        volumeMounts:
+        # 工作空间
+        - name: workspace
+          mountPath: /workspace
+        
+        # 配置文件（只读）
+        - name: config
+          mountPath: /workspace/config
+          readOnly: true
+        
+        # 共享数据（如果需要访问 LlamaFactory 数据）
+        - name: shared-data
+          mountPath: /shared-only
+          readOnly: false
+        
+        # 共享内存
+        - name: dev-shm
+          mountPath: /dev/shm
+        
+        # 健康检查
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      
+      volumes:
+      # 工作空间 PVC
+      - name: workspace
+        persistentVolumeClaim:
+          claimName: pvc-docker-agent-workspace
+      
+      # 配置文件 ConfigMap
+      - name: config
+        configMap:
+          name: docker-agent-config
+      
+      # 共享数据（与 LlamaFactory 共享）
+      - name: shared-data
+        persistentVolumeClaim:
+          claimName: pvc-capacity-userdata
+          readOnly: false
+      
+      # 共享内存
+      - name: dev-shm
+        emptyDir:
+          medium: Memory
+          sizeLimit: "8Gi"
+      
+      # 镜像拉取密钥
+      imagePullSecrets:
+      - name: lfol-secret
+      
+      # 节点选择（可选）
+      # nodeSelector:
+      #   node.kubernetes.io/instance-type: "H100"
+      
+      # 容忍度（可选）
+      # tolerations:
+      # - key: "nvidia.com/gpu"
+      #   operator: "Exists"
+      #   effect: "NoSchedule"
+
+---
+# ------------------------------------------------------------
+# 11. Ingress（可选，用于域名访问）
+# ------------------------------------------------------------
+# 如果需要通过域名访问，取消注释并修改配置
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: ingress-docker-agent
+#   namespace: llama-factory
+#   annotations:
+#     nginx.ingress.kubernetes.io/rewrite-target: /
+#     nginx.ingress.kubernetes.io/ssl-redirect: "true"
+# spec:
+#   ingressClassName: nginx
+#   tls:
+#   - hosts:
+#     - docker-agent.yourdomain.com
+#     secretName: docker-agent-tls
+#   rules:
+#   - host: docker-agent.yourdomain.com
+#     http:
+#       paths:
+#       - path: /
+#         pathType: Prefix
+#         backend:
+#           service:
+#             name: svc-docker-agent
+#             port:
+#               number: 8000
