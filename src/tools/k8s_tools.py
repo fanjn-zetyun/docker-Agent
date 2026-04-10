@@ -7,9 +7,36 @@ import subprocess
 import logging
 import time
 import json
+import yaml
+import tempfile
 from langchain.tools import tool
 
 logger = logging.getLogger(__name__)
+
+
+def _load_k8s_config():
+    """
+    加载 K8S 部署配置
+
+    Returns:
+        配置模块，如果不存在则返回 None
+    """
+    workspace_path = os.getenv("COZE_WORKSPACE_PATH", "/workspace/projects")
+    config_path = os.path.join(workspace_path, "config/k8s_deployment_config.py")
+
+    if not os.path.exists(config_path):
+        return None
+
+    try:
+        import sys
+        sys.path.insert(0, os.path.dirname(config_path))
+
+        config_module_name = os.path.splitext(os.path.basename(config_path))[0]
+        config_module = __import__(config_module_name)
+
+        return config_module
+    except Exception:
+        return None
 
 
 def _get_current_namespace() -> str:
@@ -62,6 +89,148 @@ def k8s_get_current_namespace() -> str:
         f"📍 当前命名空间: {namespace}\n\n"
         f"获取方式: {'环境变量 POD_NAMESPACE' if os.getenv('POD_NAMESPACE') else 'kubectl config'}\n"
     )
+
+
+@tool
+def k8s_create_validation_pod(
+    namespace: str,
+    pod_name: str,
+    image: str,
+    use_full_resources: bool = False
+) -> str:
+    """
+    创建用于验证的 LlamaFactory pod，使用完整的生产环境配置
+
+    Args:
+        namespace: K8S 命名空间
+        pod_name: pod 名称
+        image: 镜像名称（包含标签）
+        use_full_resources: 是否使用完整资源配置（默认 False，使用验证配置）
+
+    Returns:
+        创建操作的结果
+
+    Example:
+        k8s_create_validation_pod(
+            namespace="llama-test",
+            pod_name="llama-factory-validation",
+            image="registry.hd-02.alayanew.com:8443/alayanew-4fd285c4-c4f3-4e92-80ee-26169717cba8/llamafactory-online:lf0.9.5-tf5.5.0-torch2.8.0-cu12.6-1.0-nydus"
+        )
+    """
+    try:
+        # 加载 K8S 配置
+        k8s_config = _load_k8s_config()
+
+        # 构建 pod YAML
+        pod_yaml = {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "name": pod_name,
+                "namespace": namespace,
+                "labels": {
+                    "app": "llama-factory-validation",
+                    "purpose": "image-validation"
+                }
+            },
+            "spec": {
+                "restartPolicy": "OnFailure",
+                "containers": [{
+                    "name": "llama-factory-validation",
+                    "image": image,
+                    "imagePullPolicy": "IfNotPresent",
+                }]
+            }
+        }
+
+        # 添加镜像拉取密钥
+        if k8s_config and hasattr(k8s_config, 'IMAGE_PULL_SECRET'):
+            pod_yaml["spec"]["imagePullSecrets"] = [
+                {"name": k8s_config.IMAGE_PULL_SECRET["name"]}
+            ]
+
+        # 添加启动命令
+        if k8s_config and hasattr(k8s_config, 'POD_COMMAND'):
+            pod_yaml["spec"]["containers"][0]["command"] = k8s_config.POD_COMMAND
+
+        # 添加环境变量
+        env_vars = {}
+        if k8s_config and hasattr(k8s_config, 'POD_ENV_VARS'):
+            env_vars = k8s_config.POD_ENV_VARS.copy()
+        pod_yaml["spec"]["containers"][0]["env"] = [
+            {"name": k, "value": str(v)} for k, v in env_vars.items()
+        ]
+
+        # 添加端口
+        if k8s_config and hasattr(k8s_config, 'POD_PORTS'):
+            pod_yaml["spec"]["containers"][0]["ports"] = k8s_config.POD_PORTS
+
+        # 添加资源配置
+        if use_full_resources and k8s_config and hasattr(k8s_config, 'FULL_RESOURCES'):
+            pod_yaml["spec"]["containers"][0]["resources"] = k8s_config.FULL_RESOURCES
+        elif k8s_config and hasattr(k8s_config, 'POD_RESOURCES'):
+            pod_yaml["spec"]["containers"][0]["resources"] = k8s_config.POD_RESOURCES
+        else:
+            # 默认配置
+            pod_yaml["spec"]["containers"][0]["resources"] = {
+                "limits": {"cpu": "4", "memory": "16Gi"},
+                "requests": {"cpu": "2", "memory": "8Gi"}
+            }
+
+        # 添加存储卷挂载
+        if k8s_config and hasattr(k8s_config, 'POD_VOLUME_MOUNTS'):
+            pod_yaml["spec"]["containers"][0]["volumeMounts"] = k8s_config.POD_VOLUME_MOUNTS
+
+        if k8s_config and hasattr(k8s_config, 'POD_VOLUMES'):
+            pod_yaml["spec"]["volumes"] = k8s_config.POD_VOLUMES
+
+        # 添加健康检查
+        if k8s_config and hasattr(k8s_config, 'READINESS_PROBE'):
+            pod_yaml["spec"]["containers"][0]["readinessProbe"] = k8s_config.READINESS_PROBE
+
+        # 写入临时 YAML 文件
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+            yaml_file = f.name
+            yaml.dump(pod_yaml, f, default_flow_style=False)
+
+        logger.info(f"创建验证 pod: {pod_name} in namespace: {namespace}")
+
+        # 执行 kubectl create 命令
+        cmd = ["kubectl", "apply", "-f", yaml_file]
+
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True
+        )
+
+        # 删除临时文件
+        try:
+            os.unlink(yaml_file)
+        except:
+            pass
+
+        if result.returncode == 0:
+            return (
+                f"✅ 成功创建验证 pod！\n"
+                f"Pod 名称: {pod_name}\n"
+                f"命名空间: {namespace}\n"
+                f"镜像: {image}\n"
+                f"资源配置: {'完整' if use_full_resources else '验证'}\n"
+                f"GPU: {pod_yaml['spec']['containers'][0]['resources'].get('limits', {}).get('nvidia.com/gpu-h100-80gb-hbm3', '0')}\n\n"
+                f"输出:\n{result.stdout}\n\n"
+                f"提示：使用 k8s_wait_for_pod_ready 等待 pod 就绪"
+            )
+        else:
+            return (
+                f"❌ 创建 pod 失败！\n"
+                f"命令: {' '.join(cmd)}\n"
+                f"错误信息:\n{result.stderr}"
+            )
+
+    except Exception as e:
+        logger.error(f"创建验证 pod 时发生异常: {str(e)}")
+        return f"❌ 创建验证 pod 时发生异常: {str(e)}"
 
 
 @tool
