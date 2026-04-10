@@ -23,6 +23,7 @@ Docker Agent 是一个专门用于自动化构建和验证 LlamaFactory Docker �
 - 🤖 **智能诊断**：自动诊断镜像问题并提供修复建议
 - 🔐 **权限管理**：完整的 RBAC 配置，支持 Pod 创建和管理
 - ⚙️ **灵活配置**：支持自定义模型配置和 K8S 配置
+- 🎨 **Web UI 界面**：基于 Streamlit 的可视化交互界面
 
 ## 🔧 环境要求
 
@@ -234,6 +235,29 @@ curl -X POST http://localhost:8000/run \
     }
   }'
 ```
+
+### Web UI 模式（推荐）
+
+```bash
+# 使用启动脚本（Linux/Mac）
+./scripts/start_web_ui.sh
+
+# 使用启动脚本（Windows）
+scripts\start_web_ui.bat
+
+# 或者直接使用 streamlit
+streamlit run src/web_ui.py
+```
+
+Web UI 提供可视化的交互界面，包含：
+- 💬 聊天交互界面
+- 📊 任务监控面板
+- 🔍 K8S 状态查看
+- 📋 实时日志显示
+
+**访问地址**: http://localhost:8501
+
+详细的 Web UI 使用指南请参考 [Web UI 使用文档](docs/WEB_UI_GUIDE.md)。
 
 ### 典型使用场景
 
@@ -498,6 +522,7 @@ spec:
 - [K8S 部署配置文档](docs/K8S_DEPLOYMENT.md) - K8S 部署配置详解
 - [K8S 部署和使用文档](docs/K8S_DEPLOY_USAGE.md) - K8S 部署和使用指南
 - [K8S 快速部署指南](k8s/README.md) - 快速部署到 K8S
+- [Web UI 使用指南](docs/WEB_UI_GUIDE.md) - Web UI 界面使用说明
 
 ## 🤝 贡献
 
