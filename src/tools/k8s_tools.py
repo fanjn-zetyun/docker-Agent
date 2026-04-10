@@ -113,7 +113,7 @@ def k8s_create_validation_pod(
     Example:
         k8s_create_validation_pod(
             namespace="llama-test",
-            pod_name="llama-factory-validation",
+            pod_name="fjn-validation",
             image="registry.hd-02.alayanew.com:8443/alayanew-4fd285c4-c4f3-4e92-80ee-26169717cba8/llamafactory-online:lf0.9.5-tf5.5.0-torch2.8.0-cu12.6-1.0-nydus"
         )
     """
@@ -129,14 +129,14 @@ def k8s_create_validation_pod(
                 "name": pod_name,
                 "namespace": namespace,
                 "labels": {
-                    "app": "llama-factory-validation",
+                    "app": "fjn-validation",
                     "purpose": "image-validation"
                 }
             },
             "spec": {
                 "restartPolicy": "OnFailure",
                 "containers": [{
-                    "name": "llama-factory-validation",
+                    "name": "fjn-validation",
                     "image": image,
                     "imagePullPolicy": "IfNotPresent",
                 }]
@@ -263,8 +263,8 @@ def k8s_create_pod(
     Example:
         k8s_create_pod(
             namespace="llama-test",
-            pod_name="llama-factory-test",
-            image="registry.example.com/llama-factory:latest",
+            pod_name="fjn-test",
+            image="registry.example.com/fjn:latest",
             resources={"cpu": "4", "memory": "8Gi"}
         )
     """
@@ -276,11 +276,11 @@ def k8s_create_pod(
             "metadata": {
                 "name": pod_name,
                 "namespace": namespace,
-                "labels": labels or {"app": "llama-factory-test"}
+                "labels": labels or {"app": "fjn-test"}
             },
             "spec": {
                 "containers": [{
-                    "name": "llama-factory",
+                    "name": "fjn",
                     "image": image,
                     "imagePullPolicy": "IfNotPresent",
                 }]
@@ -366,13 +366,13 @@ def k8s_get_pod_status(
     Args:
         namespace: K8S 命名空间
         pod_name: pod 名称（可选）
-        label_selector: 标签选择器（可选，例如：app=llama-factory-test）
+        label_selector: 标签选择器（可选，例如：app=fjn-test）
 
     Returns:
         pod 状态信息
 
     Example:
-        k8s_get_pod_status(namespace="llama-test", pod_name="llama-factory-test")
+        k8s_get_pod_status(namespace="llama-test", pod_name="fjn-test")
     """
     try:
         cmd = ["kubectl", "get", "pods", "-n", namespace]
@@ -430,7 +430,7 @@ def k8s_get_pod_logs(
         pod 日志内容
 
     Example:
-        k8s_get_pod_logs(namespace="llama-test", pod_name="llama-factory-test", tail_lines=200)
+        k8s_get_pod_logs(namespace="llama-test", pod_name="fjn-test", tail_lines=200)
     """
     try:
         cmd = ["kubectl", "logs", "-n", namespace, pod_name]
@@ -491,7 +491,7 @@ def k8s_delete_pod(
         删除操作的结果
 
     Example:
-        k8s_delete_pod(namespace="llama-test", pod_name="llama-factory-test", force=True)
+        k8s_delete_pod(namespace="llama-test", pod_name="fjn-test", force=True)
     """
     try:
         cmd = ["kubectl", "delete", "pod", "-n", namespace, pod_name]
@@ -541,7 +541,7 @@ def k8s_wait_for_pod_ready(
         等待结果
 
     Example:
-        k8s_wait_for_pod_ready(namespace="llama-test", pod_name="llama-factory-test", timeout=600)
+        k8s_wait_for_pod_ready(namespace="llama-test", pod_name="fjn-test", timeout=600)
     """
     try:
         logger.info(f"等待 pod 就绪: {pod_name}, timeout: {timeout}s")
@@ -617,7 +617,7 @@ def k8s_exec_command(
         命令执行结果
 
     Example:
-        k8s_exec_command(namespace="llama-test", pod_name="llama-factory-test", command="python -c 'import torch; print(torch.__version__)'")
+        k8s_exec_command(namespace="llama-test", pod_name="fjn-test", command="python -c 'import torch; print(torch.__version__)'")
     """
     try:
         cmd = ["kubectl", "exec", "-n", namespace, pod_name]

@@ -85,7 +85,7 @@ VALIDATION_OUTPUT = {
 # Kubernetes 相关配置
 
 # 命名空间配置（留空则自动检测）
-K8S_NAMESPACE = None  # 例如: "llama-factory-test"
+K8S_NAMESPACE = None  # 例如: "fjn-test"
 
 # Pod 资源限制
 K8S_POD_RESOURCES = {

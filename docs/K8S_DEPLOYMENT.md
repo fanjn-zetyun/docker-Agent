@@ -119,7 +119,7 @@ POD_VOLUME_MOUNTS = [
 
 ```python
 POD_PORTS = [
-    {"name": "llama-factory", "containerPort": 7860},
+    {"name": "fjn", "containerPort": 7860},
     {"name": "jupyter", "containerPort": 8888},
     {"name": "vscode", "containerPort": 8080},
 ]
@@ -133,7 +133,7 @@ POD_PORTS = [
 # 使用验证资源配置（默认）
 k8s_create_validation_pod(
     namespace="llama-test",
-    pod_name="llama-factory-validation",
+    pod_name="fjn-validation",
     image="registry.hd-02.alayanew.com:8443/alayanew-4fd285c4-c4f3-4e92-80ee-26169717cba8/llamafactory-online:lf0.9.5-tf5.5.0-torch2.8.0-cu12.6-1.0-nydus",
     use_full_resources=False  # 使用验证配置（1 GPU）
 )
@@ -145,7 +145,7 @@ k8s_create_validation_pod(
 # 使用完整生产资源配置
 k8s_create_validation_pod(
     namespace="llama-test",
-    pod_name="llama-factory-prod",
+    pod_name="fjn-prod",
     image="registry.hd-02.alayanew.com:8443/alayanew-4fd285c4-c4f3-4e92-80ee-26169717cba8/llamafactory-online:lf0.9.5-tf5.5.0-torch2.8.0-cu12.6-1.0-nydus",
     use_full_resources=True  # 使用生产配置（2 GPU + RDMA）
 )

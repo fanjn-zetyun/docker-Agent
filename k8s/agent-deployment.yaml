@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: svc-docker-agent
-  namespace: llama-factory
+  namespace: fjn
 spec:
   ports:
   - name: agent-http
@@ -17,7 +17,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: svc-docker-agent-nodeport
-  namespace: llama-factory
+  namespace: fjn
 spec:
   ports:
   - name: agent-http
@@ -33,7 +33,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: deploy-docker-agent
-  namespace: llama-factory
+  namespace: fjn
 spec:
   replicas: 1
   selector:
@@ -112,7 +112,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: docker-agent-config
-  namespace: llama-factory
+  namespace: fjn
 data:
   # 将 agent_llm_config.json 的内容放在这里
   agent_llm_config.json: |
@@ -156,7 +156,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: docker-agent-secret
-  namespace: llama-factory
+  namespace: fjn
 type: Opaque
 stringData:
   api-key: "your-api-key-here"
@@ -166,7 +166,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: pvc-docker-agent-workspace
-  namespace: llama-factory
+  namespace: fjn
 spec:
   accessModes:
     - ReadWriteOnce

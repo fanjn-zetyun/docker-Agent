@@ -22,20 +22,20 @@ Agent 在 K8S 中提供 HTTP 服务，支持多种访问方式：
 kubectl apply -f k8s/agent-deployment.yaml
 
 # 等待 pod 就绪
-kubectl wait --for=condition=ready pod -l app=docker-agent -n llama-factory --timeout=300s
+kubectl wait --for=condition=ready pod -l app=docker-agent -n fjn --timeout=300s
 
 # 查看 pod 状态
-kubectl get pods -n llama-factory -l app=docker-agent
+kubectl get pods -n fjn -l app=docker-agent
 ```
 
 ### 端口转发
 
 ```bash
 # 端口转发到本地 8000
-kubectl port-forward -n llama-factory deploy/docker-agent 8000:8000
+kubectl port-forward -n fjn deploy/docker-agent 8000:8000
 
 # 或者转发特定 pod
-kubectl port-forward -n llama-factory <pod-name> 8000:8000
+kubectl port-forward -n fjn <pod-name> 8000:8000
 ```
 
 ### 访问 Agent
@@ -102,7 +102,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: ingress-docker-agent
-  namespace: llama-factory
+  namespace: fjn
   annotations:
     # 使用你的 Ingress Controller
     nginx.ingress.kubernetes.io/rewrite-target: /
@@ -283,7 +283,7 @@ spec:
     spec:
       containers:
       # LlamaFactory 主容器
-      - name: llama-factory
+      - name: fjn
         image: registry.hd-02.alayanew.com:8443/.../llamafactory-online:latest
         ...
 
@@ -313,30 +313,30 @@ volumes:
 
 ```bash
 # 查看 Agent 日志
-kubectl logs -n llama-factory -l app=docker-agent -f
+kubectl logs -n fjn -l app=docker-agent -f
 
 # 查看特定 pod 日志
-kubectl logs -n llama-factory <pod-name> -f
+kubectl logs -n fjn <pod-name> -f
 ```
 
 ### 查看状态
 
 ```bash
 # 查看 pod 状态
-kubectl get pods -n llama-factory -l app=docker-agent
+kubectl get pods -n fjn -l app=docker-agent
 
 # 查看 Service
-kubectl get svc -n llama-factory -l app=docker-agent
+kubectl get svc -n fjn -l app=docker-agent
 
 # 查看 Ingress
-kubectl get ingress -n llama-factory
+kubectl get ingress -n fjn
 ```
 
 ### 监控指标
 
 ```bash
 # 实时监控
-kubectl top pod -n llama-factory -l app=docker-agent
+kubectl top pod -n fjn -l app=docker-agent
 ```
 
 ## 🔒 安全性
@@ -358,7 +358,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: docker-agent-netpol
-  namespace: llama-factory
+  namespace: fjn
 spec:
   podSelector:
     matchLabels:
@@ -369,7 +369,7 @@ spec:
   - from:
     - podSelector:
         matchLabels:
-          app: llama-factory
+          app: fjn
     ports:
     - protocol: TCP
       port: 8000
@@ -384,7 +384,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: docker-agent-role
-  namespace: llama-factory
+  namespace: fjn
 rules:
 - apiGroups: [""]
   resources: ["pods", "pods/log", "pods/exec"]
@@ -400,33 +400,33 @@ rules:
 
 ```bash
 # 查看事件
-kubectl describe pod -n llama-factory -l app=docker-agent
+kubectl describe pod -n fjn -l app=docker-agent
 
 # 查看日志
-kubectl logs -n llama-factory <pod-name>
+kubectl logs -n fjn <pod-name>
 ```
 
 ### 无法访问服务
 
 ```bash
 # 检查 Service
-kubectl describe svc svc-docker-agent -n llama-factory
+kubectl describe svc svc-docker-agent -n fjn
 
 # 检查 Endpoint
-kubectl get endpoints svc-docker-agent -n llama-factory
+kubectl get endpoints svc-docker-agent -n fjn
 
 # 检查端口转发
-kubectl port-forward -n llama-factory <pod-name> 8000:8000
+kubectl port-forward -n fjn <pod-name> 8000:8000
 ```
 
 ### Agent 执行失败
 
 ```bash
 # 查看详细日志
-kubectl logs -n llama-factory <pod-name> --tail=100
+kubectl logs -n fjn <pod-name> --tail=100
 
 # 进入容器调试
-kubectl exec -it -n llama-factory <pod-name> -- bash
+kubectl exec -it -n fjn <pod-name> -- bash
 ```
 
 ## 🎉 总结

@@ -20,7 +20,7 @@ image: registry.hd-02.alayanew.com:8443/alayanew-4fd285c4-c4f3-4e92-80ee-2616971
 kubectl apply -f k8s/docker-agent-deployment.yaml
 
 # 查看部署状态
-kubectl get pods -n llama-factory -l app=docker-agent
+kubectl get pods -n fjn -l app=docker-agent
 ```
 
 ### 3. 访问 Agent
@@ -29,7 +29,7 @@ kubectl get pods -n llama-factory -l app=docker-agent
 
 ```bash
 # 端口转发到本地
-kubectl port-forward -n llama-factory deploy/docker-agent 8000:8000
+kubectl port-forward -n fjn deploy/docker-agent 8000:8000
 
 # 新开一个终端测试
 curl http://localhost:8000/health
@@ -49,7 +49,7 @@ curl http://<node-ip>:30800/health
 
 ```bash
 # 在集群内的其他 pod 中访问
-curl http://svc-docker-agent.llama-factory.svc.cluster.local:8000/health
+curl http://svc-docker-agent.fjn.svc.cluster.local:8000/health
 ```
 
 ## 📋 配置说明
@@ -65,7 +65,7 @@ curl http://svc-docker-agent.llama-factory.svc.cluster.local:8000/health
 
 ### 默认配置
 
-- **命名空间**: `llama-factory`
+- **命名空间**: `fjn`
 - **Service**: ClusterIP + NodePort (30800)
 - **资源**: 2-4 CPU, 4-8Gi 内存
 - **存储**: 20Gi 工作空间
@@ -108,26 +108,26 @@ curl -X POST http://localhost:8000/run \
 
 ```bash
 # 实时日志
-kubectl logs -n llama-factory -l app=docker-agent -f
+kubectl logs -n fjn -l app=docker-agent -f
 
 # 查看 pod 名称
-kubectl get pods -n llama-factory -l app=docker-agent
+kubectl get pods -n fjn -l app=docker-agent
 
 # 查看特定 pod 日志
-kubectl logs -n llama-factory <pod-name> -f
+kubectl logs -n fjn <pod-name> -f
 ```
 
 ### 查看状态
 
 ```bash
 # Pod 状态
-kubectl get pods -n llama-factory -l app=docker-agent
+kubectl get pods -n fjn -l app=docker-agent
 
 # Service 状态
-kubectl get svc -n llama-factory -l app=docker-agent
+kubectl get svc -n fjn -l app=docker-agent
 
 # 详细信息
-kubectl describe pod -n llama-factory -l app=docker-agent
+kubectl describe pod -n fjn -l app=docker-agent
 ```
 
 ## 🔧 常用操作
@@ -135,13 +135,13 @@ kubectl describe pod -n llama-factory -l app=docker-agent
 ### 重启 Agent
 
 ```bash
-kubectl rollout restart deployment/deploy-docker-agent -n llama-factory
+kubectl rollout restart deployment/deploy-docker-agent -n fjn
 ```
 
 ### 扩容
 
 ```bash
-kubectl scale deployment/deploy-docker-agent --replicas=3 -n llama-factory
+kubectl scale deployment/deploy-docker-agent --replicas=3 -n fjn
 ```
 
 ### 更新镜像
@@ -163,20 +163,20 @@ kubectl delete -f k8s/docker-agent-deployment.yaml
 
 ```bash
 # 查看事件
-kubectl describe pod -n llama-factory -l app=docker-agent
+kubectl describe pod -n fjn -l app=docker-agent
 
 # 查看日志
-kubectl logs -n llama-factory <pod-name>
+kubectl logs -n fjn <pod-name>
 ```
 
 ### 无法访问服务
 
 ```bash
 # 检查 Service
-kubectl get svc -n llama-factory -l app=docker-agent
+kubectl get svc -n fjn -l app=docker-agent
 
 # 检查 Endpoint
-kubectl get endpoints -n llama-factory svc-docker-agent
+kubectl get endpoints -n fjn svc-docker-agent
 ```
 
 ### 权限问题
@@ -185,7 +185,7 @@ Agent 需要 RBAC 权限来创建和管理 pod。YAML 中已配置，但如果�
 
 ```bash
 # 检查 RoleBinding
-kubectl get rolebinding -n llama-factory docker-agent-rolebinding -o yaml
+kubectl get rolebinding -n fjn docker-agent-rolebinding -o yaml
 ```
 
 ## 📝 配置示例

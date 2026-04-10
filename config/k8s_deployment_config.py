@@ -87,7 +87,7 @@ POD_ENV_VARS = {
 
 ## Pod 端口配置
 POD_PORTS = [
-    {"name": "llama-factory", "containerPort": 7860, "protocol": "TCP"},
+    {"name": "fjn", "containerPort": 7860, "protocol": "TCP"},
     {"name": "jupyter", "containerPort": 8888, "protocol": "TCP"},
     {"name": "vscode", "containerPort": 8080, "protocol": "TCP"},
 ]

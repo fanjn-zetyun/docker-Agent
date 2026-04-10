@@ -75,7 +75,7 @@ def run_llama_factory_training(
     Example:
         run_llama_factory_training(
             namespace="llama-test",
-            pod_name="llama-factory-test"
+            pod_name="fjn-test"
         )
     """
     try:
@@ -206,7 +206,7 @@ def verify_llama_factory_installation(
         验证结果
 
     Example:
-        verify_llama_factory_installation(namespace="llama-test", pod_name="llama-factory-test")
+        verify_llama_factory_installation(namespace="llama-test", pod_name="fjn-test")
     """
     try:
         logger.info(f"验证 LlamaFactory 安装: {pod_name}")
@@ -300,7 +300,7 @@ def run_quick_validation(
         验证结果
 
     Example:
-        run_quick_validation(namespace="llama-test", pod_name="llama-factory-test")
+        run_quick_validation(namespace="llama-test", pod_name="fjn-test")
     """
     try:
         logger.info(f"运行快速验证: {pod_name}")
