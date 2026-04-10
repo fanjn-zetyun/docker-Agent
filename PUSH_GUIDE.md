@@ -9,16 +9,18 @@ SSH 密钥已添加成功！但由于当前环境缺少 SSH 客户端，无法�
 ## 📂 文件位置
 
 ```
-/workspace/projects/docker-agent-complete.bundle
+/workspace/projects/docker-agent-final.bundle
 ```
 
-文件大小: 51KB
+文件大小: 86KB
 
-## 📊 待推送的内容（10 个提交）
+## 📊 待推送的内容（11 个提交）
 
 ### 提交列表
 
 ```
+2637654 chore: 生成最终的 Bundle 文件
+a34697b docs: 更新推送指南
 4bfd1d6 chore: 更新 Bundle 文件
 990cc00 docs: 添加完整的推送指南
 757b6e6 feat: 添加 Bundle 推送工具和文档
