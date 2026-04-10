@@ -9,14 +9,18 @@ SSH 密钥已添加成功！但由于当前环境缺少 SSH 客户端，无法�
 ## 📂 文件位置
 
 ```
-/workspace/projects/docker-agent-full.bundle
+/workspace/projects/docker-agent-complete.bundle
 ```
 
-## 📊 待推送的内容（8 个提交）
+文件大小: 51KB
+
+## 📊 待推送的内容（10 个提交）
 
 ### 提交列表
 
 ```
+4bfd1d6 chore: 更新 Bundle 文件
+990cc00 docs: 添加完整的推送指南
 757b6e6 feat: 添加 Bundle 推送工具和文档
 83774c6 feat: 添加 SSH 密钥生成工具
 88512e4 docs: 添加代码推送指南
@@ -60,21 +64,21 @@ c1c34b2 feat: 添加 CLI 命令行交互模式
 
 ```bash
 # 1. 复制 bundle 文件到你的项目目录
-# 从 /workspace/projects/docker-agent-full.bundle 复制
+# 从 /workspace/projects/docker-agent-complete.bundle 复制
 
 # 2. 运行推送脚本
 chmod +x scripts/push_bundle.sh
-./scripts/push_bundle.sh docker-agent-full.bundle
+./scripts/push_bundle.sh docker-agent-complete.bundle
 ```
 
 #### Windows
 
 ```cmd
 # 1. 复制 bundle 文件到你的项目目录
-# 从 /workspace/projects/docker-agent-full.bundle 复制
+# 从 /workspace/projects/docker-agent-complete.bundle 复制
 
 # 2. 运行推送脚本
-python scripts\push_bundle.py docker-agent-full.bundle
+python scripts\push_bundle.py docker-agent-complete.bundle
 ```
 
 ### 方法二：使用 GitHub Token（最简单）
@@ -112,7 +116,7 @@ git clone git@github.com:fanjn-zetyun/docker-Agent.git repo
 cd repo
 
 # 3. 拉取 bundle 文件
-git pull /path/to/docker-agent-full.bundle dev
+git pull /path/to/docker-agent-complete.bundle dev
 
 # 4. 推送到 GitHub
 git push origin dev
@@ -155,13 +159,13 @@ https://github.com/fanjn-zetyun/docker-Agent
 
 ```bash
 # 查看 bundle 中的提交
-git log docker-agent-full.bundle
+git log docker-agent-complete.bundle
 
 # 查看 bundle 中的文件
-git ls-tree -r --name-only docker-agent-full.bundle
+git ls-tree -r --name-only docker-agent-complete.bundle
 
 # 查看 bundle 统计信息
-git log --stat docker-agent-full.bundle
+git log --stat docker-agent-complete.bundle
 ```
 
 ## 💡 推送成功后的下一步
@@ -202,7 +206,8 @@ A: 确保在 git 仓库目录中执行命令。
 
 ### Q: Bundle 文件在哪里？
 
-A: 文件位置: `/workspace/projects/docker-agent-full.bundle`
+A: 文件位置: `/workspace/projects/docker-agent-complete.bundle`
+文件大小: 51KB
 
 ### Q: 如何下载 bundle 文件？
 
