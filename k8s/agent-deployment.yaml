@@ -1,0 +1,175 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-docker-agent
+  namespace: llama-factory
+spec:
+  ports:
+  - name: agent-http
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    app: docker-agent
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: svc-docker-agent-nodeport
+  namespace: llama-factory
+spec:
+  ports:
+  - name: agent-http
+    port: 8000
+    protocol: TCP
+    targetPort: 8000
+    nodePort: 30800
+  selector:
+    app: docker-agent
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deploy-docker-agent
+  namespace: llama-factory
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docker-agent
+  template:
+    metadata:
+      labels:
+        app: docker-agent
+    spec:
+      containers:
+      - name: docker-agent
+        # 替换为你的镜像地址
+        image: registry.hd-02.alayanew.com:8443/your-namespace/docker-agent:latest
+        imagePullPolicy: IfNotPresent
+
+        # 启动命令：以 HTTP 模式运行 Agent
+        command: ["python", "src/main.py"]
+        args: ["-m", "http", "-p", "8000"]
+
+        ports:
+        - containerPort: 8000
+          protocol: TCP
+
+        env:
+        # 环境变量：API Key（如果需要）
+        - name: COZE_WORKLOAD_IDENTITY_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: docker-agent-secret
+              key: api-key
+        - name: COZE_INTEGRATION_MODEL_BASE_URL
+          value: "https://api.example.com/v1"
+
+        # 工作目录环境变量
+        - name: COZE_WORKSPACE_PATH
+          value: "/workspace"
+
+        resources:
+          limits:
+            cpu: "4"
+            memory: "8Gi"
+          requests:
+            cpu: "2"
+            memory: "4Gi"
+
+        # 存储卷挂载（用于持久化数据和配置）
+        volumeMounts:
+        - name: workspace
+          mountPath: /workspace
+        - name: config
+          mountPath: /workspace/config
+          readOnly: true
+
+      volumes:
+      # 工作空间
+      - name: workspace
+        persistentVolumeClaim:
+          claimName: pvc-docker-agent-workspace
+
+      # 配置文件
+      - name: config
+        configMap:
+          name: docker-agent-config
+          items:
+          - key: agent_llm_config.json
+            path: agent_llm_config.json
+
+      # 镜像拉取密钥
+      imagePullSecrets:
+      - name: lfol-secret
+
+---
+# ConfigMap 用于存储配置
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: docker-agent-config
+  namespace: llama-factory
+data:
+  # 将 agent_llm_config.json 的内容放在这里
+  agent_llm_config.json: |
+    {
+        "config": {
+            "model": "doubao-seed-1-6-251015",
+            "temperature": 0.7,
+            "top_p": 0.9,
+            "max_completion_tokens": 10000,
+            "timeout": 600,
+            "thinking": "disabled"
+        },
+        "sp": "# 角色定义\n你是 LlamaFactory 镜像构建专家...",
+        "tools": [
+            "git_pull",
+            "git_checkout",
+            "git_merge",
+            "git_status",
+            "analyze_dockerfile",
+            "learn_dockerfile_pattern",
+            "validate_dockerfile",
+            "build_docker_image",
+            "push_docker_image",
+            "k8s_get_current_namespace",
+            "k8s_create_validation_pod",
+            "k8s_create_pod",
+            "k8s_get_pod_status",
+            "k8s_get_pod_logs",
+            "k8s_delete_pod",
+            "k8s_wait_for_pod_ready",
+            "k8s_exec_command",
+            "verify_llama_factory_installation",
+            "run_llama_factory_training",
+            "run_quick_validation"
+        ]
+    }
+
+---
+# Secret 用于存储敏感信息（API Key 等）
+apiVersion: v1
+kind: Secret
+metadata:
+  name: docker-agent-secret
+  namespace: llama-factory
+type: Opaque
+stringData:
+  api-key: "your-api-key-here"
+---
+# PVC 用于持久化工作空间
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-docker-agent-workspace
+  namespace: llama-factory
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
